@@ -22,7 +22,8 @@
 
 ### 2. Firmware
 - Flowchart:
-  - ![Flowcharts (3)](https://github.com/PhumsitInsakul/SleepSense/assets/96218618/67796555-bfcf-4440-83f6-f3269d9c6d6c)
+  - ![Flowcharts (4)](https://github.com/PhumsitInsakul/SleepSense_650-757/assets/96218618/54ea9b38-0cbd-4398-a512-3b6d75256110)
+
 
 -  มีการควบคุมการทำงานแบบคาบเวลาด้วย millis()
 -  มีการเปิดการใช้งาน Watchdog timer เพื่อป้องกันการค้าง และมีการเปิดใช้งาน esp32 light sleep mode เมื่อ sensor is off
