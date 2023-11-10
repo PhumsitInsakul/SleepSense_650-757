@@ -79,7 +79,7 @@ private:
 void BH1750FVI::begin()
 {
   Wire.begin();
-  I2CWrite(0x01); // Power up
+  I2CWrite(0x01); 
   delay(10);
   I2CWrite(DeviceMode);
 }
