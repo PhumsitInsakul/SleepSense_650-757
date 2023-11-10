@@ -4,33 +4,36 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <driver/i2s.h>
-#include <HTTPClient.h> //
+#include <HTTPClient.h> // ไม่ได้ใช้ ดึงข้อมูลเข้า google sheet
 
+#include "esp_system.h"  // library watchdog
 #include <esp_task_wdt.h> // เพิ่ม library watchdog
 
 #define I2S_WS 15
 #define I2S_SD 32
 #define I2S_SCK 14
 #define I2S_PORT I2S_NUM_0
-#define bufferLen 64
+#define bufferLen 64  // I2S
+
 #define WDT_TIMEOUT 30000 // 30 วินาที
 
-#define LED_2 27
+#define ledPin 26 // lux high > 18
+#define LED_2 27 // off on sensor
+
 
 #define OLED_RESET 4
 
 Adafruit_SSD1306 display(OLED_RESET);
 
 int status_sw = 0;
-int ledPin = 26;
 int event = 0;
 
 int16_t sBuffer[bufferLen];
-int counter = 0; // Counter to keep track of mean > 155 occurrencesint
+int counter = 0; // เพิ่มค่าเมื่อ mean > 155
 int Timer_2 = 0;
 int Timer_3 = 0;
 int Timer_Qua = 0;
-int lux_Qua = 0; // Counter to keep track of lux > 18  occurrencesint
+int lux_Qua = 0; // เพิ่มค่าเมื่อ lux > 18
 int light = 0;
 int sound = 0;
 //----------------------------------------------------------------------- ไม่ได้ใช้
@@ -50,18 +53,18 @@ int value3;
 class BH1750FVI
 {
 public:
-  enum eDeviceAddress
+  enum Address_LH
   {
-    k_DevAddress_L = 0x23,
-    k_DevAddress_H = 0x5C
+    Address_L = 0x23,  //address I2C Mode low
+    Address_H = 0x5C   //address I2C Mode High 
   };
 
-  enum eDeviceMode
+  enum Mode
   {
-    k_DevModeContLowRes = 0x13
+    Mode_ContLowRes = 0x13  // mode ทำงานต่อเนื่องในความละเอียดต่ำ
   };
 
-  BH1750FVI() : m_DeviceAddress(k_DevAddress_L), m_DeviceMode(k_DevModeContLowRes) {}
+  BH1750FVI() : DeviceAddress(Address_L), DeviceMode(Mode_ContLowRes) {}
 
   void begin();
   uint16_t getLightIntensity();
@@ -69,8 +72,8 @@ public:
 private:
   void I2CWrite(uint8_t data);
 
-  eDeviceAddress m_DeviceAddress;
-  eDeviceMode m_DeviceMode;
+  Address_LH DeviceAddress;  // เก็บ address
+  Mode DeviceMode;         // เก็บ mode
 };
 
 void BH1750FVI::begin()
@@ -78,24 +81,24 @@ void BH1750FVI::begin()
   Wire.begin();
   I2CWrite(0x01); // Power up
   delay(10);
-  I2CWrite(m_DeviceMode);
+  I2CWrite(DeviceMode);
 }
 
-uint16_t BH1750FVI::getLightIntensity()
+uint16_t BH1750FVI::getLightIntensity() //-32,768 to 32,767
 {
   uint16_t value = 0;
 
-  Wire.requestFrom(static_cast<int>(m_DeviceAddress), 2);
-  value = Wire.read();
-  value <<= 8;
-  value |= Wire.read();
+  Wire.requestFrom(static_cast<int>(DeviceAddress), 2); //ขอข้อมูลจาก BH1750FVI ในรูปแบบ2 byte
+  value = Wire.read();  // อ่าน byte แรก
+  value <<= 8;          // เลื่อน byte เพื่อทำการ or
+  value |= Wire.read();  // อ่าน byte ที่สอง
 
-  return value / 1.2;
+  return value / 1.2;  // คืนค่าความเข้มแสงในหน่วย lux (1.2 เพื่อแปลงผล)
 }
 
 void BH1750FVI::I2CWrite(uint8_t data)
 {
-  Wire.beginTransmission(static_cast<int>(m_DeviceAddress));
+  Wire.beginTransmission(static_cast<int>(DeviceAddress));
   Wire.write(data);
   Wire.endTransmission();
 }
@@ -133,14 +136,34 @@ void i2s_setpin()
 
 /////////////////////////// Set up ///////////////////////////////////
 
+const int button = 0; //gpio to use to trigger delay
+const int wdtTimeout = 3000; //time in ms to trigger the watchdog
+hw_timer_t *timer = NULL;
+
+void IRAM_ATTR resetModule() {
+ ets_printf("reboot\n");
+ esp_restart();
+}
+
+
 void setup()
 {
   // Initialize serial and wait for port to open:
   esp_task_wdt_init(WDT_TIMEOUT, true);
 
-  esp_sleep_enable_timer_wakeup(WDT_TIMEOUT * 1000); // set timer หลังจากที่ WDT_TIMEOUT* 1วิ
+  //esp_sleep_enable_timer_wakeup(WDT_TIMEOUT * 1000); // set timer หลังจากที่ WDT_TIMEOUT* 1วิ
 
   Serial.begin(115200);
+  Serial.println("running setup");
+  
+  pinMode(button , INPUT_PULLUP); 
+  /*
+  timer = timerBegin(0, 80, true); //timer 0, div 80
+  timerAttachInterrupt(timer, &resetModule, true); //attach callback
+  timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
+  timerAlarmEnable(timer); 
+  */
+  
   pinMode(ledPin, OUTPUT);
   pinMode(LED_2, OUTPUT); // status_sw
 
@@ -164,7 +187,7 @@ void setup()
   display.setTextColor(WHITE, BLACK);
   display.display();
 
-  lightSensor.begin();
+  lightSensor.begin(); // sensor แสง
 
   Serial.println("Setup I2S ...");
   delay(1000);
@@ -186,6 +209,16 @@ void setup()
 void loop()
 {
   ArduinoCloud.update();
+  /*
+  timerWrite(timer, 0); //reset timer (feed watchdog)
+ long loopTime = millis();
+ //while button is pressed, delay up to 3 seconds to trigger the timer
+ while (!digitalRead(button)) {
+ delay(500);
+ }
+ delay(1000); //simulate work
+ loopTime = millis() - loopTime;
+ */
 
   if (status_sw == 1)
   {
@@ -203,12 +236,12 @@ void loop()
       light_sensor = lux;
 
       if (lux <= 18)
-      {                            // 0-18 lux is considered good quality sleep
+      {                            // 0-18  = good quality sleep
         digitalWrite(ledPin, LOW); // Turn on the LED
         Serial.printf("Lux: %d\n", lux);
       }
       else
-      {                             // More than 18 lux is considered bad quality sleep
+      {                             // > 18 = bad quality sleep
         digitalWrite(ledPin, HIGH); // Turn off the LED
         Serial.printf("Lux: %d - Sleep quality is bad\n", lux);
         lux_Qua++;
@@ -250,7 +283,7 @@ void loop()
       display.clearDisplay(); // เคลียร์จอ
 
       if (lux_Qua >= 2 || counter >= 2)
-      {
+      { 
         Serial.printf("คุณภาพการนอนของคุณย่ำแย่ ;(\n");
         quality = "Bad";
         lux_Qua = 0;
@@ -300,6 +333,7 @@ void loop()
   else
   { // พอ sensor is off esp32 จะเข้าสู่สถานะพลังงานต่ำ (light sleep mode )
     event = 0;
+    
     // esp_light_sleep_start();
   }
 }
