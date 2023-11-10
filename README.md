@@ -25,7 +25,7 @@
   - ![Flowcharts (3)](https://github.com/PhumsitInsakul/SleepSense/assets/96218618/67796555-bfcf-4440-83f6-f3269d9c6d6c)
 
 -  มีการควบคุมการทำงานแบบคาบเวลาด้วย millis()
--  มีการเปิดการใช้งาน Watchdog timer เพื่อป้องการการค้าง และมีการเปิดใช้งาน esp32 light sleep mode เมื่อ sensor is off
+-  มีการเปิดการใช้งาน Watchdog timer เพื่อป้องกันการค้าง และมีการเปิดใช้งาน esp32 light sleep mode เมื่อ sensor is off
 
 ### 3. Frontend
 - Work flow:
