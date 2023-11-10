@@ -8,8 +8,8 @@
 #define bufferLen 64
 
 int16_t sBuffer[bufferLen];
-int counter = 0; // Counter to keep track of mean > 100 occurrences
-int lux_Qua = 0;
+int counter = 0; // เพิ่มค่าเมื่อ mean > 155
+int lux_Qua = 0; // เพิ่มค่าเมื่อ lux > 18
 
 class BH1750FVI {
 public:
@@ -36,7 +36,7 @@ private:
 
 void BH1750FVI::begin() {
     Wire.begin();
-    I2CWrite(0x01); // Power up
+    I2CWrite(0x01); 
     delay(10);
     I2CWrite(m_DeviceMode);
 }
@@ -108,11 +108,11 @@ void loop() {
   size_t bytesIn = 0;
   esp_err_t result = i2s_read(I2S_PORT, &sBuffer, bufferLen, &bytesIn, portMAX_DELAY);
 
-  if (lux <= 18) { // 0-20 lux is considered good quality sleep
-      digitalWrite(ledPin, LOW); // Turn on the LED
+  if (lux <= 18) { 
+      digitalWrite(ledPin, LOW);
       Serial.printf("Lux: %d\n", lux);
-  } else { // More than 20 lux is considered bad quality sleep
-      digitalWrite(ledPin, HIGH); // Turn off the LED
+  } else { 
+      digitalWrite(ledPin, HIGH); 
       Serial.printf("Lux: %d - Sleep quality is bad\n", lux);
       lux_Qua++;
   }
